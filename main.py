@@ -13,6 +13,25 @@ HEIGHT = 25
 WIDTH = 18
 WINDOW = None
 
+DIR_ARR = [
+    [
+        [-2, 0],
+        [-1, +1],
+        [+1, +1],
+        [+2, 0],
+        [+1, 0],
+        [-1, 0]
+    ],
+    [
+        [-2, 0],
+        [-1, 0],
+        [+1, 0],
+        [+2, 0],
+        [+1, -1],
+        [-1, -1],
+    ]
+]
+
 class Tile:
     def __init__(self, y, x):
         self.y = y
@@ -20,6 +39,16 @@ class Tile:
         self.color_pair = 0
 
         self.solid = False
+
+        self.lines = [
+            '..','..','..'
+        ]
+        if random.randint(0, 100) > 70:
+            self.lines = [
+                'AA',
+                'AA',
+                'AA'
+            ]
 
 
 HIGHTLIGHT_POINTS = []
@@ -120,24 +149,7 @@ def generate_map(config: MapGenerationConfig=None) -> tuple[list[list[Tile]], li
 
     offshoots_count = 3
     offshoots = []
-    dir_arr = [
-        [
-            [-2, 0],
-            [-1, +1],
-            [+1, +1],
-            [+2, 0],
-            [+1, 0],
-            [-1, 0]
-        ],
-        [
-            [-2, 0],
-            [-1, 0],
-            [+1, 0],
-            [+2, 0],
-            [+1, -1],
-            [-1, -1],
-        ]
-    ]
+    
     for i in range(offshoots_count):
         # [yloc, xloc, weight]
         o = [start_point_loc[0], start_point_loc[1], 0]
@@ -147,7 +159,7 @@ def generate_map(config: MapGenerationConfig=None) -> tuple[list[list[Tile]], li
     while (len(offshoots)):
         for offshoot in offshoots:
             offshoot[2] += 1
-            dir = random.choice(dir_arr[offshoot[0] % 2])
+            dir = random.choice(DIR_ARR[offshoot[0] % 2])
             newy = offshoot[0] + dir[0]
             newx = offshoot[1] + dir[1]
             
@@ -228,19 +240,24 @@ def defer_draw(func, args):
     }]
 
 
-def draw_with_color_pair(args):
+def deferred_draw_tile(args):
     win = args['win']
     y = args['y']
     x = args['x']
-    color_pair = args['color_pair']
-    win.attron(curses.color_pair(color_pair))
-    basic_draw_sprite(win, y, x)
-    win.attroff(curses.color_pair(color_pair))
+    tile = args['tile']
+    win.attron(curses.color_pair(tile.color_pair))
+    basic_draw_sprite(win, y, x, tile)
+    win.attroff(curses.color_pair(tile.color_pair))
 
 
-def basic_draw_sprite(win, y, x):
+def basic_draw_sprite(win, y, x, tile):
     for ii in range(len(SPRITE)):
         win.addstr(y + ii, x, SPRITE[ii])
+    win.addstr(y + 1, x + 2, tile.lines[0])
+    # win.addstr(y + 1, x + 2, str(tile['pos'][0]))
+    win.addstr(y + 2, x + 2, tile.lines[1])
+    # win.addstr(y + 2, x + 2, str(tile['pos'][1]))
+    win.addstr(y + 3, x + 2, tile.lines[2])
 
 
 def draw_sprite(win, y, x, tile, selected):
@@ -248,21 +265,17 @@ def draw_sprite(win, y, x, tile, selected):
         return
     
     # win.attron(curses.color_pair(tile.color_pair))
-    basic_draw_sprite(win, y, x)
-    win.addstr(y + 1, x + 2, f'aa')
-    # win.addstr(y + 1, x + 2, str(tile['pos'][0]))
-    win.addstr(y + 2, x + 2, 'aa')
-    # win.addstr(y + 2, x + 2, str(tile['pos'][1]))
-    win.addstr(y + 3, x + 2, 'aa')
+    basic_draw_sprite(win, y, x, tile)
+    
     if tile.color_pair != 0:
-        defer_draw(draw_with_color_pair, {'win': win, 'y': y, 'x': x, 'color_pair': tile.color_pair})
+        defer_draw(deferred_draw_tile, {'win': win, 'y': y, 'x': x, 'tile': tile})
     # win.attroff(curses.color_pair(tile.color_pair))
 
 
     if not selected:
         return
     
-    defer_draw(draw_with_color_pair, {'win': win, 'y': y, 'x': x, 'color_pair': 1})
+    defer_draw(deferred_draw_tile, {'win': win, 'y': y, 'x': x, 'tile': tile})
 
 
 def draw_map(win, map, xbase, pos):
@@ -313,7 +326,7 @@ def main(stdscr: 'curses._CursesWindow'):
 
     # TODO move to center?
 
-    game_map[y][x].color_pair = 2
+    # game_map[y][x].color_pair = 2
 
     num_of_players = 4
     angle = random.randint(0, 6)
@@ -334,7 +347,23 @@ def main(stdscr: 'curses._CursesWindow'):
                 break
         t = game_map[last_loc[0]][last_loc[1]]
         t.color_pair = playeri + 3
+        t.lines = [
+            '  ',
+            'MM',
+            '  '
+        ]
         # spread
+        dirs = DIR_ARR[last_loc[0] % 2]
+        for dir in dirs:
+            locy = last_loc[0] + dir[0]
+            locx = last_loc[1] + dir[1]
+            if locy < 0 or locx < 0 or locy >= config.height or locx >= config.width:
+                continue
+            t = game_map[locy][locx]
+            t.color_pair = playeri + 3
+            t.lines = [
+                '','',''
+            ]
 
         angle += 2 * math.pi / num_of_players
 
